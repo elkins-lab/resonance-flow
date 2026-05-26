@@ -1,0 +1,22 @@
+site_name: ResonanceFlow
+theme:
+  name: material
+  palette:
+    primary: teal
+    accent: indigo
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          setup_commands:
+            - import sys
+            - sys.path.append(".")
+
+nav:
+  - Home: index.md
+  - API Reference:
+    - Losses: api/losses.md
+    - Model: api/model.md
+  - Theory: theory.md

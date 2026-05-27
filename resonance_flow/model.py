@@ -1,3 +1,4 @@
+import jax
 from flax import linen as nn
 
 
@@ -15,7 +16,7 @@ class TransformerCoordinatePredictor(nn.Module):
     dropout_rate: float = 0.1
 
     @nn.compact
-    def __call__(self, x, deterministic: bool = True):
+    def __call__(self, x: jax.Array, deterministic: bool = True) -> jax.Array:
         """
         Predicts 3D coordinates.
 

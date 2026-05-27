@@ -1,3 +1,5 @@
+from typing import cast
+
 import jax
 import jax.numpy as jnp
 import optax
@@ -11,22 +13,35 @@ from resonance_flow.losses import (
 )
 from resonance_flow.model import TransformerCoordinatePredictor
 
+...
 
-def create_train_state(rng, model, learning_rate=1e-3):
+
+def create_train_state(
+    rng: jax.Array, model: TransformerCoordinatePredictor, learning_rate: float = 1e-3
+) -> train_state.TrainState:
     """Creates initial `TrainState`."""
     dummy_input = jnp.ones((1, 10), dtype=jnp.int32)
     params = model.init(rng, dummy_input, deterministic=True)["params"]
     tx = optax.adamw(learning_rate)
-    return train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx)
+    return cast(
+        train_state.TrainState,
+        train_state.TrainState.create(apply_fn=model.apply, params=params, tx=tx),
+    )
 
 
 @jax.jit
-def train_step(state, batch, dropout_rng, atom_radii, measured_rdcs):
+def train_step(
+    state: train_state.TrainState,
+    batch: jax.Array,
+    dropout_rng: jax.Array,
+    atom_radii: jax.Array,
+    measured_rdcs: jax.Array,
+) -> tuple[train_state.TrainState, jax.Array, jax.Array, jax.Array, jax.Array]:
     """Takes a single training step."""
     steric_loss_fn = get_steric_clash_loss()
     bond_loss_fn = get_bond_length_loss()
 
-    def loss_fn(params):
+    def loss_fn(params: optax.Params) -> tuple[jax.Array, tuple[jax.Array, jax.Array, jax.Array]]:
         coords = state.apply_fn(
             {"params": params},
             batch,
@@ -55,7 +70,7 @@ def train_step(state, batch, dropout_rng, atom_radii, measured_rdcs):
     return state, loss, l_steric, l_bond, l_rdc
 
 
-def main(num_steps=101, learning_rate=1e-2):
+def main(num_steps: int = 101, learning_rate: float = 1e-2) -> train_state.TrainState:
     rng = jax.random.PRNGKey(0)
     rng, init_rng = jax.random.split(rng)
 

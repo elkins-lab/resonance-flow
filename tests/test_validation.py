@@ -11,7 +11,7 @@ from resonance_flow.losses import (
 )
 
 
-def test_rdc_synthetic_recoverability():
+def test_rdc_synthetic_recoverability() -> None:
     """
     MATHEMATICAL VALIDATION:
     Verify that rdc_loss can perfectly fit a set of vectors to RDCs
@@ -41,7 +41,7 @@ def test_rdc_synthetic_recoverability():
     assert loss < 1e-10
 
 
-def test_ubiquitin_geometry_validation():
+def test_ubiquitin_geometry_validation() -> None:
     """
     STRUCTURAL VALIDATION:
     Use real Ubiquitin (1D3Z) geometry and verify that the RDC loss
@@ -87,7 +87,7 @@ def test_ubiquitin_geometry_validation():
     assert loss_scrambled > 1.0
 
 
-def test_steric_clash_validation():
+def test_steric_clash_validation() -> None:
     """
     BIOPHYSICAL VALIDATION:
     Verify that the steric clash loss identifies overlaps in a
@@ -121,7 +121,7 @@ def test_steric_clash_validation():
 # ---------------------------------------------------------------------------
 
 
-def test_rdc_q_factor_perfect_structure():
+def test_rdc_q_factor_perfect_structure() -> None:
     """
     PUBLICATION VALIDATION: Cornilescu, Marquardt, Ottiger & Bax, JACS 1998;
     Clore & Garrett, JACS 1999.
@@ -162,7 +162,7 @@ def test_rdc_q_factor_perfect_structure():
     assert q_random > q_perfect * 100, "Random structure should have much worse Q-factor"
 
 
-def test_rdc_rotation_invariance():
+def test_rdc_rotation_invariance() -> None:
     """
     PHYSICAL VALIDATION: Saupe, Z. Naturforsch. 1964.
 
@@ -208,7 +208,7 @@ def test_rdc_rotation_invariance():
     )
 
 
-def test_bond_loss_ideal_geometry():
+def test_bond_loss_ideal_geometry() -> None:
     """
     PUBLICATION VALIDATION: Engh & Huber, Acta Crystallogr. A, 1991.
 
@@ -245,7 +245,7 @@ def test_bond_loss_ideal_geometry():
     )
 
 
-def test_noe_upper_bound_loss():
+def test_noe_upper_bound_loss() -> None:
     """
     PUBLICATION VALIDATION: Wüthrich, NMR of Proteins and Nucleic Acids,
     1986; Güntert, Mumenthaler & Wüthrich, J. Mol. Biol. 1997 (CYANA).
@@ -286,7 +286,7 @@ def test_noe_upper_bound_loss():
     assert grads[2, 0] > 0.0, "Atom 2 should be pushed away from atom 1 (positive x)"
 
 
-def test_saupe_tensor_eigenvalue_bounds():
+def test_saupe_tensor_eigenvalue_bounds() -> None:
     """
     PHYSICAL VALIDATION: Bax & Tjandra, J. Biomol. NMR, 1997;
     Losonczi, Andrec, Fischer & Prestegard, J. Magn. Reson., 1999.

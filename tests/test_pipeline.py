@@ -5,7 +5,7 @@ from resonance_flow.model import TransformerCoordinatePredictor
 from resonance_flow.train import create_train_state, train_step
 
 
-def test_model_output_shape():
+def test_model_output_shape() -> None:
     rng = jax.random.PRNGKey(0)
     batch_size = 2
     seq_len = 8
@@ -17,7 +17,7 @@ def test_model_output_shape():
     assert coords.shape == (batch_size, seq_len, 3)
 
 
-def test_train_step_updates_params():
+def test_train_step_updates_params() -> None:
     rng = jax.random.PRNGKey(42)
     rng, init_rng, step_rng = jax.random.split(rng, 3)
     seq_len = 5
@@ -31,7 +31,9 @@ def test_train_step_updates_params():
 
     new_state, loss, _, _, _ = train_step(state, batch, step_rng, atom_radii, measured_rdcs)
 
-    def params_changed(p1, p2):
+    from typing import Any
+
+    def params_changed(p1: Any, p2: Any) -> bool:
         return any(
             not jnp.array_equal(v1, v2)
             for v1, v2 in zip(jax.tree_util.tree_leaves(p1), jax.tree_util.tree_leaves(p2))

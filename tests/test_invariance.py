@@ -3,7 +3,7 @@ import jax.numpy as jnp
 from resonance_flow.losses import get_steric_clash_loss
 
 
-def test_rotation_invariance():
+def test_rotation_invariance() -> None:
     """Verify that the loss is invariant to global rotation of the structure."""
     loss_fn = get_steric_clash_loss()
     positions = jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
@@ -23,7 +23,7 @@ def test_rotation_invariance():
     print("Rotation invariance test passed!")
 
 
-def test_translation_invariance():
+def test_translation_invariance() -> None:
     """Verify that the loss is invariant to global translation."""
     loss_fn = get_steric_clash_loss()
     positions = jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])

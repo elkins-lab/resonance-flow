@@ -1,8 +1,14 @@
+from collections.abc import Callable
+from typing import cast
+
+import jax
 import jax.numpy as jnp
 from jax_md import space
 
 
-def get_steric_clash_loss(box_size=None, exclude_bonded_range=0):
+def get_steric_clash_loss(
+    box_size: float | None = None, exclude_bonded_range: int = 0
+) -> Callable[[jax.Array, jax.Array], jax.Array]:
     """
     Returns a function to compute the steric clash (atom overlap) penalty.
 
@@ -23,7 +29,7 @@ def get_steric_clash_loss(box_size=None, exclude_bonded_range=0):
 
     space_metric = space.metric(displacement_fn)
 
-    def steric_clash_loss(positions, atom_radii):
+    def steric_clash_loss(positions: jax.Array, atom_radii: jax.Array) -> jax.Array:
         """
         Computes the penalty for overlapping atoms.
 
@@ -49,12 +55,14 @@ def get_steric_clash_loss(box_size=None, exclude_bonded_range=0):
         overlap = overlap * mask
 
         loss = jnp.sum(overlap**2) / 2.0
-        return loss
+        return cast(jax.Array, loss)
 
     return steric_clash_loss
 
 
-def get_bond_length_loss(target_distance=3.8):
+def get_bond_length_loss(
+    target_distance: float = 3.8,
+) -> Callable[[jax.Array], jax.Array]:
     """
     Penalises deviations from the ideal Cα–Cα virtual bond length.
 
@@ -68,16 +76,16 @@ def get_bond_length_loss(target_distance=3.8):
                          Default 3.8 Å (Engh & Huber 1991).
     """
 
-    def bond_length_loss(positions):
+    def bond_length_loss(positions: jax.Array) -> jax.Array:
         # Compute distances between consecutive Cα atoms.
         diffs = positions[1:] - positions[:-1]
         distances = jnp.linalg.norm(diffs, axis=-1)
-        return jnp.mean((distances - target_distance) ** 2)
+        return cast(jax.Array, jnp.mean((distances - target_distance) ** 2))
 
     return bond_length_loss
 
 
-def estimate_nh_proxy_vectors(ca_coords):
+def estimate_nh_proxy_vectors(ca_coords: jax.Array) -> jax.Array:
     """
     Estimates backbone N-H proxy vectors from Cα coordinates.
 
@@ -102,10 +110,12 @@ def estimate_nh_proxy_vectors(ca_coords):
     # Anti-parallel virtual bond: Cα(i-1) − Cα(i+1), normalised.
     raw = ca_coords[:-2] - ca_coords[2:]  # shape (N-2, 3)
     norms = jnp.linalg.norm(raw, axis=-1, keepdims=True)
-    return raw / (norms + 1e-8)
+    return cast(jax.Array, raw / (norms + 1e-8))
 
 
-def rdc_loss(predicted_vectors, measured_rdcs, d_max=21700.0):
+def rdc_loss(
+    predicted_vectors: jax.Array, measured_rdcs: jax.Array, d_max: float = 21700.0
+) -> jax.Array:
     """
     Scientifically correct RDC loss using Saupe tensor fitting.
     Fits the alignment tensor to the structure, then calculates the residual.
@@ -147,7 +157,9 @@ def rdc_loss(predicted_vectors, measured_rdcs, d_max=21700.0):
     return jnp.mean((predicted_rdcs - measured_rdcs) ** 2)
 
 
-def rdc_q_factor(predicted_vectors, measured_rdcs, d_max=21700.0):
+def rdc_q_factor(
+    predicted_vectors: jax.Array, measured_rdcs: jax.Array, d_max: float = 21700.0
+) -> jax.Array:
     """
     Computes the RDC Q-factor (Cornilescu, Marquardt, Ottiger & Bax, JACS 1998).
 
@@ -180,7 +192,9 @@ def rdc_q_factor(predicted_vectors, measured_rdcs, d_max=21700.0):
     return rmsd / (rms_obs + 1e-10)
 
 
-def noe_upper_bound_loss(positions, noe_pairs, upper_bounds):
+def noe_upper_bound_loss(
+    positions: jax.Array, noe_pairs: jax.Array, upper_bounds: jax.Array
+) -> jax.Array:
     """
     Penalises violations of NOE-derived inter-proton distance upper bounds.
 

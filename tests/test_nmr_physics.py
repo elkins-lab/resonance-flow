@@ -12,7 +12,7 @@ import jax.numpy as jnp
 from resonance_flow.losses import estimate_nh_proxy_vectors, get_steric_clash_loss
 
 
-def test_nh_proxy_vectors_are_unit_length():
+def test_nh_proxy_vectors_are_unit_length() -> None:
     """
     estimate_nh_proxy_vectors must return exactly unit vectors regardless
     of the scale of the input Cα coordinates.
@@ -33,7 +33,7 @@ def test_nh_proxy_vectors_are_unit_length():
     )
 
 
-def test_nh_proxy_vectors_output_shape():
+def test_nh_proxy_vectors_output_shape() -> None:
     """
     For N Cα atoms, estimate_nh_proxy_vectors must return exactly N-2 vectors.
     This matches the number of interior residues (indices 1 … N-2 inclusive)
@@ -48,14 +48,14 @@ def test_nh_proxy_vectors_output_shape():
         ), f"seq_len={seq_len}: expected ({seq_len - 2}, 3), got {proxies.shape}"
 
 
-def test_nh_proxy_vectors_gradient_flows():
+def test_nh_proxy_vectors_gradient_flows() -> None:
     """
     Gradients must flow through estimate_nh_proxy_vectors so that the RDC
     loss can backpropagate into the Cα coordinate predictions.
     """
     ca_coords = jax.random.normal(jax.random.PRNGKey(0), (6, 3))
 
-    def proxy_norm_sum(coords):
+    def proxy_norm_sum(coords: jax.Array) -> jax.Array:
         proxies = estimate_nh_proxy_vectors(coords)
         return jnp.sum(proxies**2)
 
@@ -70,7 +70,7 @@ def test_nh_proxy_vectors_gradient_flows():
 # ---------------------------------------------------------------------------
 
 
-def test_steric_bonded_exclusion_eliminates_adjacent_penalty():
+def test_steric_bonded_exclusion_eliminates_adjacent_penalty() -> None:
     """
     BIOPHYSICAL VALIDATION: AMBER / CHARMM 1-2 exclusion convention.
 
@@ -100,7 +100,7 @@ def test_steric_bonded_exclusion_eliminates_adjacent_penalty():
     )
 
 
-def test_steric_non_adjacent_still_penalised_with_exclusion():
+def test_steric_non_adjacent_still_penalised_with_exclusion() -> None:
     """
     Non-adjacent atoms (index separation > exclude_bonded_range) that
     genuinely overlap must still be penalised even when bonded exclusion
@@ -124,7 +124,7 @@ def test_steric_non_adjacent_still_penalised_with_exclusion():
     assert loss > 0.0, "Non-adjacent overlapping atoms must still incur a steric penalty"
 
 
-def test_steric_exclusion_range_2_removes_13_pairs():
+def test_steric_exclusion_range_2_removes_13_pairs() -> None:
     """
     With exclude_bonded_range=2, both 1-2 AND 1-3 pairs (i.e. atoms
     separated by 1 or 2 positions in the chain) are excluded, matching
@@ -156,7 +156,7 @@ def test_steric_exclusion_range_2_removes_13_pairs():
     assert loss_excl_2 < loss_excl_1, "1-3 exclusion must remove the 0-2 clash penalty"
 
 
-def test_steric_default_matches_original_behaviour():
+def test_steric_default_matches_original_behaviour() -> None:
     """
     Regression: the default exclude_bonded_range=0 must reproduce the
     original single-diagonal mask (1 - eye), so existing tests are unaffected.

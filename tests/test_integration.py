@@ -1,7 +1,7 @@
 from resonance_flow.train import main
 
 
-def test_full_training_run():
+def test_full_training_run() -> None:
     """Verify the end-to-end training loop runs without error."""
     # Run for just 2 steps to verify integration
     state = main(num_steps=2)

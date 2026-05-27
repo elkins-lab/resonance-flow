@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from resonance_flow.losses import get_steric_clash_loss
 
 
-def test_periodic_boundary_conditions():
+def test_periodic_boundary_conditions() -> None:
     """Verify steric clash loss works with PBC."""
     # Atoms at opposite ends of a 10.0 Angstrom box
     box_size = 10.0

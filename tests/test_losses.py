@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from resonance_flow.losses import get_steric_clash_loss, rdc_loss
 
 
-def test_steric_clash_gradient():
+def test_steric_clash_gradient() -> None:
     loss_fn = get_steric_clash_loss()
     positions = jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
     atom_radii = jnp.array([1.0, 1.0])
@@ -17,7 +17,7 @@ def test_steric_clash_gradient():
     assert grads[1, 0] < 0.0
 
 
-def test_rdc_gradient():
+def test_rdc_gradient() -> None:
     # Use 6 vectors and random measured values to ensure they can't be perfectly fitted
     # (since the tensor only has 5 degrees of freedom).
     vectors = jnp.array(

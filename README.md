@@ -7,7 +7,6 @@
 [![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue.svg)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-0.1.0--alpha-orange.svg)](https://github.com/elkins/resonance-flow/releases)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Linting: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
 [![JAX](https://img.shields.io/badge/framework-JAX%20%2B%20Flax-9cf.svg)](https://jax.readthedocs.io/)
 
@@ -22,7 +21,8 @@
 - **NOE Distance Restraints** — Flat-bottomed harmonic penalty on upper-bound violations, the primary 3D information source in protein NMR (Wüthrich 1986; Güntert et al. 1997).
 - **Biophysically Correct Geometry** — Bond length loss calibrated to the canonical Cα–Cα distance of 3.80 Å (Engh & Huber 1991).
 - **Differentiable Steric Clash** — Harmonic atom-overlap penalty with optional AMBER/CHARMM-style 1-2/1-3 bonded exclusions, powered by `jax-md`.
-- **RDC Quality Metric** — Built-in Q-factor (Cornilescu et al. 1998) for structural validation without additional tooling.
+- **RDC Quality Metric** — Built-in Q-factor and Q_free cross-validation (Cornilescu et al. 1998; Clore & Garrett 1999) for structural validation without additional tooling.
+- **Backbone Conformational Checks** — Pseudo-torsion angle calculation (Oldfield & Hubbard 1994) to verify secondary structure plausibility in Cα-only models.
 - **PBC Support** — Periodic boundary conditions for simulation-box contexts.
 - **Transformer-to-Coords** — A pre-LN Transformer architecture that maps amino acid sequences directly to physical 3D Cα coordinates.
 
@@ -112,6 +112,8 @@ rdc_loss(nh_vecs, measured_rdc)          # → scalar MSE
 
 # ── RDC Q-factor (structure quality; Q ≤ 0.20 = high quality) ───────────────
 rdc_q_factor(nh_vecs, measured_rdc)      # → 0 – 1 (lower is better)
+train_mask = jnp.array([True, True, True, False, False, False])
+rdc_q_free(nh_vecs, measured_rdc, train_mask)  # → Q-factor on held-out data
 
 # ── N-H proxy vectors from Cα coordinates (Cα-only models) ──────────────────
 ca_coords = jax.random.normal(jax.random.PRNGKey(0), (10, 3))
@@ -206,7 +208,7 @@ ResonanceFlow is the most complete end-to-end model in this ecosystem, depending
 @software{resonance_flow,
   author  = {Elkins, George},
   title   = {ResonanceFlow: Differentiable protein structure prediction with NMR self-correction},
-  year    = {2024},
+  year    = {2026},
   url     = {https://github.com/elkins/resonance-flow},
   version = {0.1.0}
 }

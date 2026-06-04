@@ -117,6 +117,24 @@ DYANA (Güntert, Mumenthaler & Wüthrich, *J. Mol. Biol.*, 1997).
 
 ---
 
+## Pseudo-Torsion Angles
+
+Because ResonanceFlow often predicts only C$\alpha$ coordinates,
+traditional $\phi/\psi$ Ramachandran plots cannot be constructed.
+Instead, the **pseudo-torsion angle** ($\alpha$) formed by four
+consecutive C$\alpha$ atoms ($i-1, i, i+1, i+2$) is used to assess
+structural plausibility (Oldfield & Hubbard, *Proteins*, 1994).
+
+Predicted structures should cluster within the following canonical ranges:
+- **$\alpha$-helix**:  ~ +50°
+- **$\beta$-strand**: ~ ±180°
+
+Deviations from these clusters (e.g., angles near 0°) typically indicate
+unphysical backbone geometry or "zigzagging" that satisfies bond
+constraints but violates steric or folding laws.
+
+---
+
 ## References
 
 | Citation | Role in ResonanceFlow |
@@ -130,3 +148,4 @@ DYANA (Güntert, Mumenthaler & Wüthrich, *J. Mol. Biol.*, 1997).
 | Güntert, Mumenthaler & Wüthrich, *J. Mol. Biol.* **273**, 283 (1997) | NOE restraint potential (CYANA) |
 | Zweckstetter & Bax, *JACS* **122**, 3791 (2000) | Cα-based N-H proxy vectors |
 | Ottiger & Bax, *JACS* **120**, 12334 (1998) | d_max for ¹⁵N-¹H at 600 MHz |
+| Oldfield & Hubbard, *Proteins* **19**, 366 (1994) | Cα pseudo-torsion distribution |

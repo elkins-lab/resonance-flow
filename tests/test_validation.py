@@ -203,9 +203,9 @@ def test_rdc_rotation_invariance() -> None:
 
     print(f"RDC loss original:  {loss_original:.4f}")
     print(f"RDC loss rotated:   {loss_rotated:.4f}")
-    assert jnp.allclose(loss_original, loss_rotated, atol=1e-2), (
-        f"RDC loss changed after rotation: {loss_original:.4f} vs {loss_rotated:.4f}"
-    )
+    assert jnp.allclose(
+        loss_original, loss_rotated, atol=1e-2
+    ), f"RDC loss changed after rotation: {loss_original:.4f} vs {loss_rotated:.4f}"
 
 
 def test_bond_loss_ideal_geometry() -> None:
@@ -231,9 +231,9 @@ def test_bond_loss_ideal_geometry() -> None:
     )
     loss_ideal = bond_fn(positions)
     print(f"Bond loss at 3.8 Å (ideal):  {loss_ideal:.2e}")
-    assert jnp.isclose(loss_ideal, 0.0, atol=1e-6), (
-        f"Bond loss must be 0 at ideal 3.8 Å geometry, got {loss_ideal}"
-    )
+    assert jnp.isclose(
+        loss_ideal, 0.0, atol=1e-6
+    ), f"Bond loss must be 0 at ideal 3.8 Å geometry, got {loss_ideal}"
 
     # The incorrect old default of 1.52 Å would severely penalise valid geometry.
     bond_fn_wrong = get_bond_length_loss(target_distance=1.52)
@@ -335,9 +335,121 @@ def test_saupe_tensor_eigenvalue_bounds() -> None:
     # Eigenvalue bounds: principal order parameters in [-0.5, 1.0].
     eigenvalues = jnp.linalg.eigvalsh(S_matrix)
     print(f"Saupe tensor eigenvalues: {eigenvalues}")
-    assert jnp.all(eigenvalues >= -0.5 - 1e-6), (
-        f"Saupe eigenvalues must be >= -0.5, got {eigenvalues}"
+    assert jnp.all(
+        eigenvalues >= -0.5 - 1e-6
+    ), f"Saupe eigenvalues must be >= -0.5, got {eigenvalues}"
+    assert jnp.all(
+        eigenvalues <= 1.0 + 1e-6
+    ), f"Saupe eigenvalues must be <= 1.0, got {eigenvalues}"
+
+
+def test_rdc_q_free_validation() -> None:
+    """
+    PUBLICATION VALIDATION: Clore & Garrett, JACS 1999.
+
+    Q_free is calculated by fitting the alignment tensor to a subset of
+    the data (work set) and evaluating it on the remaining subset (free set).
+    If the structure is correct, Q_work ≈ Q_free. If the structure is
+    wrong, the tensor may "overfit" the work set (producing a lower Q_work),
+    but Q_free will remain high, correctly identifying the structural error.
+    """
+    rng = np.random.default_rng(123)
+    num_vectors = 40  # Enough to split 20/20
+    d_max = 21700.0
+
+    # 1. True structure (unit vectors)
+    v_true_np = rng.standard_normal((num_vectors, 3))
+    v_true_np /= np.linalg.norm(v_true_np, axis=-1, keepdims=True)
+    v_true = jnp.array(v_true_np)
+
+    # 2. Synthetic RDCs from true structure (with small experimental noise)
+    true_s = jnp.array([0.001, -0.0005, 0.0002, -0.0003, 0.0001])
+    x, y, z = v_true[:, 0], v_true[:, 1], v_true[:, 2]
+    A = d_max * jnp.stack([x**2 - z**2, y**2 - z**2, 2 * x * y, 2 * x * z, 2 * y * z], axis=1)
+    measured = A @ true_s + jnp.array(rng.standard_normal(num_vectors) * 1.0)
+
+    # 3. Structural Error: Perturb the vectors slightly (RMSD ~10 degrees)
+    # This simulates a "wrong" structure that we are testing.
+    perturbation = rng.standard_normal((num_vectors, 3)) * 0.15
+    v_wrong = v_true + perturbation
+    v_wrong /= jnp.linalg.norm(v_wrong, axis=-1, keepdims=True)
+
+    # 4. Split data: 50/50 split
+    train_mask = jnp.zeros(num_vectors, dtype=bool).at[:20].set(True)
+
+    # 5. Calculate Q_work (fitted on train set)
+    # We use rdc_q_factor on the subset to get Q_work.
+    from resonance_flow.losses import rdc_q_free
+
+    q_work = rdc_q_factor(v_wrong[train_mask], measured[train_mask], d_max=d_max)
+    q_free = rdc_q_free(v_wrong, measured, train_mask, d_max=d_max)
+
+    print(f"Q_work: {q_work:.4f}")
+    print(f"Q_free: {q_free:.4f}")
+
+    # For a "wrong" structure, Q_free is expected to be larger than Q_work
+    # because the 5 degrees of freedom in the tensor can partially
+    # compensate for structural errors in the smaller work set.
+    assert q_free > q_work, (
+        f"Q_free ({q_free:.4f}) should be larger than Q_work ({q_work:.4f})"
+        " for a perturbed structure."
     )
-    assert jnp.all(eigenvalues <= 1.0 + 1e-6), (
-        f"Saupe eigenvalues must be <= 1.0, got {eigenvalues}"
+
+    # 6. Verify for the TRUE structure
+    q_work_true = rdc_q_factor(v_true[train_mask], measured[train_mask], d_max=d_max)
+    q_free_true = rdc_q_free(v_true, measured, train_mask, d_max=d_max)
+
+    print(f"True Q_work: {q_work_true:.4f}")
+    print(f"True Q_free: {q_free_true:.4f}")
+
+    # For the true structure, they should be very similar and both low.
+    assert (
+        jnp.abs(q_work_true - q_free_true) < 0.05
+    ), "For the true structure, Q_work and Q_free should be similar."
+    assert q_free_true < 0.1, "True structure should have low Q_free."
+
+
+def test_pseudo_torsion_validation() -> None:
+    """
+    STRUCTURAL VALIDATION:
+    Verify that calculate_pseudo_torsions correctly identifies canonical
+    secondary structure signatures for Cα-only chains.
+
+    Reference:
+        Oldfield & Hubbard, Proteins: Struct. Funct. Genet. 19, 366 (1994).
+        Alpha-helix pseudo-torsions cluster around +50°.
+        Beta-strand pseudo-torsions cluster around ±180°.
+    """
+    from resonance_flow.losses import calculate_pseudo_torsions
+
+    # 1. Ideal Alpha-Helix (Right-handed)
+    # Simple helical path with radius ~2.3Å and pitch ~5.4Å per turn.
+    t = jnp.arange(10) * (2 * jnp.pi / 3.6)  # 3.6 residues per turn
+    x = 2.3 * jnp.cos(t)
+    y = 2.3 * jnp.sin(t)
+    z = 1.5 * jnp.arange(10)
+    helix_coords = jnp.stack([x, y, z], axis=1)
+
+    helix_torsions = calculate_pseudo_torsions(helix_coords)
+    print(f"Helix pseudo-torsions: {helix_torsions}")
+
+    # Right-handed helices must have positive pseudo-torsions, typically ~50°.
+    assert jnp.all(helix_torsions > 40.0)
+    assert jnp.all(helix_torsions < 60.0)
+
+    # 2. Ideal Beta-Strand (Extended)
+    # A zig-zag planar path.
+    beta_coords = jnp.array(
+        [
+            [0.0, 0.0, 0.0],
+            [3.3, 1.9, 0.0],
+            [6.6, 0.0, 0.0],
+            [9.9, 1.9, 0.0],
+            [13.2, 0.0, 0.0],
+        ]
     )
+    beta_torsions = calculate_pseudo_torsions(beta_coords)
+    print(f"Beta pseudo-torsions: {beta_torsions}")
+
+    # Extended beta-strands cluster around ±180°.
+    assert jnp.all(jnp.abs(beta_torsions) > 170.0)

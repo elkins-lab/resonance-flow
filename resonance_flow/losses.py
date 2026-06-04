@@ -113,6 +113,95 @@ def estimate_nh_proxy_vectors(ca_coords: jax.Array) -> jax.Array:
     return cast(jax.Array, raw / (norms + 1e-8))
 
 
+def calculate_pseudo_torsions(ca_coords: jax.Array) -> jax.Array:
+    """
+    Calculates pseudo-torsion angles for consecutive Cα atoms.
+
+    A pseudo-torsion is the dihedral angle formed by four consecutive
+    Cα atoms (i-1, i, i+1, i+2).  In Cα-only models, these angles are
+    the primary indicator of backbone conformation (analogous to
+    Ramachandran angles for full-atom models).
+
+    Typical pseudo-torsion values:
+        α-helix:  ~ +50°
+        β-strand: ~ ±180°
+
+    Args:
+        ca_coords: (N, 3) array of Cα coordinates.
+
+    Returns:
+        (N-3,) array of pseudo-torsion angles in degrees, range [-180, 180].
+    """
+    # 1. Compute bond vectors
+    b1 = ca_coords[1:-2] - ca_coords[:-3]
+    b2 = ca_coords[2:-1] - ca_coords[1:-2]
+    b3 = ca_coords[3:] - ca_coords[2:-1]
+
+    # 2. Compute normal vectors to the planes
+    n1 = jnp.cross(b1, b2)
+    n2 = jnp.cross(b2, b3)
+
+    # 3. Compute the angle using the atan2(y, x) robust formula.
+    # n1 and n2 are normals to the two planes formed by (b1, b2) and (b2, b3).
+    # The dihedral angle is the angle between these normals.
+    n1_norm = n1 / (jnp.linalg.norm(n1, axis=-1, keepdims=True) + 1e-8)
+    n2_norm = n2 / (jnp.linalg.norm(n2, axis=-1, keepdims=True) + 1e-8)
+    b2_unit = b2 / (jnp.linalg.norm(b2, axis=-1, keepdims=True) + 1e-8)
+
+    # y = [n1 x n2] . b2_unit
+    # x = n1 . n2
+    y = jnp.sum(jnp.cross(n1_norm, n2_norm) * b2_unit, axis=-1)
+    x = jnp.sum(n1_norm * n2_norm, axis=-1)
+
+    return cast(jax.Array, jnp.arctan2(y, x) * (180.0 / jnp.pi))
+
+
+def fit_saupe_tensor(
+    predicted_vectors: jax.Array, measured_rdcs: jax.Array, d_max: float = 21700.0
+) -> jax.Array:
+    """
+    Fits the Saupe alignment tensor (5 components) to vectors and RDCs.
+
+    Args:
+        predicted_vectors: (N, 3) internuclear vectors.
+        measured_rdcs: (N,) experimental RDC values in Hz.
+        d_max: Maximum dipolar coupling constant (Hz).
+
+    Returns:
+        (5,) array containing the independent components of the Saupe tensor
+        [Sxx, Syy, Sxy, Sxz, Syz].
+    """
+    norms = jnp.linalg.norm(predicted_vectors, axis=-1, keepdims=True)
+    v = predicted_vectors / (norms + 1e-8)
+
+    x, y, z = v[:, 0], v[:, 1], v[:, 2]
+    A = d_max * jnp.stack([x**2 - z**2, y**2 - z**2, 2 * x * y, 2 * x * z, 2 * y * z], axis=1)
+    s, _, _, _ = jnp.linalg.lstsq(A, measured_rdcs, rcond=1e-5)
+    return cast(jax.Array, s)
+
+
+def calculate_rdcs(
+    predicted_vectors: jax.Array, saupe_tensor: jax.Array, d_max: float = 21700.0
+) -> jax.Array:
+    """
+    Back-calculates RDCs for a set of vectors given a Saupe tensor.
+
+    Args:
+        predicted_vectors: (N, 3) internuclear vectors.
+        saupe_tensor: (5,) array of tensor components.
+        d_max: Maximum dipolar coupling constant (Hz).
+
+    Returns:
+        (N,) predicted RDC values in Hz.
+    """
+    norms = jnp.linalg.norm(predicted_vectors, axis=-1, keepdims=True)
+    v = predicted_vectors / (norms + 1e-8)
+
+    x, y, z = v[:, 0], v[:, 1], v[:, 2]
+    A = d_max * jnp.stack([x**2 - z**2, y**2 - z**2, 2 * x * y, 2 * x * z, 2 * y * z], axis=1)
+    return cast(jax.Array, A @ saupe_tensor)
+
+
 def rdc_loss(
     predicted_vectors: jax.Array, measured_rdcs: jax.Array, d_max: float = 21700.0
 ) -> jax.Array:
@@ -120,40 +209,12 @@ def rdc_loss(
     Scientifically correct RDC loss using Saupe tensor fitting.
     Fits the alignment tensor to the structure, then calculates the residual.
 
-    The formula follows the Saupe order matrix parametrisation:
-
-        D = d_max * (Sxx*(x²-z²) + Syy*(y²-z²) + 2*Sxy*xy + 2*Sxz*xz + 2*Syz*yz)
-
-    using the five independent components of the traceless symmetric tensor.
-
     References:
         Bax & Tjandra, J. Biomol. NMR, 1997.
         Cornilescu, Marquardt, Ottiger & Bax, J. Am. Chem. Soc., 1998.
-
-    Args:
-        predicted_vectors: (N, 3) internuclear vectors from the model.
-        measured_rdcs: (N,) experimental RDC values in Hz.
-        d_max: Maximum dipolar coupling constant.
-               Default 21 700 Hz for ¹⁵N-¹H backbone amide bonds at 600 MHz
-               (Ottiger & Bax, J. Am. Chem. Soc., 1998).
-
-    Returns:
-        Scalar MSE loss between measured and back-calculated RDCs after
-        optimal Saupe tensor fitting.
     """
-    # 1. Normalise vectors.
-    norms = jnp.linalg.norm(predicted_vectors, axis=-1, keepdims=True)
-    v = predicted_vectors / (norms + 1e-8)
-
-    # 2. Build the design matrix A so that A @ s = D_calc.
-    x, y, z = v[:, 0], v[:, 1], v[:, 2]
-    A = d_max * jnp.stack([x**2 - z**2, y**2 - z**2, 2 * x * y, 2 * x * z, 2 * y * z], axis=1)
-
-    # 3. Fit Saupe tensor (least squares; ridge penalty for numerical stability).
-    s, _, _, _ = jnp.linalg.lstsq(A, measured_rdcs, rcond=1e-5)
-
-    # 4. Back-calculate RDCs and return MSE.
-    predicted_rdcs = A @ s
+    s = fit_saupe_tensor(predicted_vectors, measured_rdcs, d_max)
+    predicted_rdcs = calculate_rdcs(predicted_vectors, s, d_max)
     return jnp.mean((predicted_rdcs - measured_rdcs) ** 2)
 
 
@@ -164,31 +225,50 @@ def rdc_q_factor(
     Computes the RDC Q-factor (Cornilescu, Marquardt, Ottiger & Bax, JACS 1998).
 
     The Q-factor is the NMR analogue of the crystallographic R-factor:
-
         Q = RMSD(D_calc − D_obs) / RMS(D_obs)
-
-    A high-quality backbone structure typically has Q ≤ 0.20 for ¹⁵N-¹H
-    RDCs.  To guard against overfitting, a Q_free computed on data *not*
-    used during fitting is preferred (Clore & Garrett, JACS 1999).
-
-    Args:
-        predicted_vectors: (N, 3) internuclear vectors from the model.
-        measured_rdcs: (N,) experimental RDC values in Hz.
-        d_max: Maximum dipolar coupling constant (Hz).
-
-    Returns:
-        Q-factor (dimensionless, 0–1; lower is better).
     """
-    norms = jnp.linalg.norm(predicted_vectors, axis=-1, keepdims=True)
-    v = predicted_vectors / (norms + 1e-8)
-
-    x, y, z = v[:, 0], v[:, 1], v[:, 2]
-    A = d_max * jnp.stack([x**2 - z**2, y**2 - z**2, 2 * x * y, 2 * x * z, 2 * y * z], axis=1)
-    s, _, _, _ = jnp.linalg.lstsq(A, measured_rdcs, rcond=1e-5)
-    predicted_rdcs = A @ s
+    s = fit_saupe_tensor(predicted_vectors, measured_rdcs, d_max)
+    predicted_rdcs = calculate_rdcs(predicted_vectors, s, d_max)
 
     rmsd = jnp.sqrt(jnp.mean((predicted_rdcs - measured_rdcs) ** 2))
     rms_obs = jnp.sqrt(jnp.mean(measured_rdcs**2))
+    return rmsd / (rms_obs + 1e-10)
+
+
+def rdc_q_free(
+    predicted_vectors: jax.Array,
+    measured_rdcs: jax.Array,
+    train_mask: jax.Array,
+    d_max: float = 21700.0,
+) -> jax.Array:
+    """
+    Computes the Q_free cross-validation metric (Clore & Garrett, JACS 1999).
+
+    Fits the Saupe tensor using only data where train_mask is True, then
+    calculates the Q-factor on the held-out data (where train_mask is False).
+    This is the gold standard for detecting overfitting to RDCs.
+
+    Args:
+        predicted_vectors: (N, 3) internuclear vectors.
+        measured_rdcs: (N,) experimental RDC values.
+        train_mask: (N,) boolean mask (True = use for fitting, False = use for Q_free).
+        d_max: Maximum dipolar coupling constant.
+
+    Returns:
+        Q_free (dimensionless).
+    """
+    # 1. Fit tensor on the training subset.
+    s = fit_saupe_tensor(predicted_vectors[train_mask], measured_rdcs[train_mask], d_max)
+
+    # 2. Evaluate on the test subset (the 'free' set).
+    test_mask = ~train_mask
+    v_test = predicted_vectors[test_mask]
+    d_test = measured_rdcs[test_mask]
+
+    predicted_test = calculate_rdcs(v_test, s, d_max)
+
+    rmsd = jnp.sqrt(jnp.mean((predicted_test - d_test) ** 2))
+    rms_obs = jnp.sqrt(jnp.mean(d_test**2))
     return rmsd / (rms_obs + 1e-10)
 
 

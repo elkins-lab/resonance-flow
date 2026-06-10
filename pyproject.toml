@@ -24,7 +24,6 @@ dependencies = [
     "jaxlib",
     "flax",
     "optax",
-    "jax-md",
     "numpy",
 ]
 

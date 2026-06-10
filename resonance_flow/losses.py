@@ -3,7 +3,6 @@ from typing import cast
 
 import jax
 import jax.numpy as jnp
-from jax_md import space
 
 
 def get_steric_clash_loss(
@@ -22,12 +21,6 @@ def get_steric_clash_loss(
                               neighbours, or 2 for 1-2 and 1-3 pairs
                               (standard AMBER / CHARMM convention).
     """
-    if box_size is None:
-        displacement_fn, _ = space.free()
-    else:
-        displacement_fn, _ = space.periodic(box_size)
-
-    space_metric = space.metric(displacement_fn)
 
     def steric_clash_loss(positions: jax.Array, atom_radii: jax.Array) -> jax.Array:
         """
@@ -41,7 +34,15 @@ def get_steric_clash_loss(
             A scalar loss representing the total steric clash penalty.
         """
         n = positions.shape[0]
-        dr = space.map_product(space_metric)(positions, positions)
+
+        diff = positions[:, None, :] - positions[None, :, :]
+        if box_size is not None:
+            diff = diff - box_size * jnp.round(diff / box_size)
+
+        dr2 = jnp.sum(diff**2, axis=-1)
+        # Avoid NaN gradients at zero distance (e.g. self-interactions)
+        dr = jnp.sqrt(jnp.where(dr2 == 0.0, 1e-10, dr2))
+
         radii_sum = atom_radii[:, None] + atom_radii[None, :]
         overlap = jnp.maximum(radii_sum - dr, 0.0)
 

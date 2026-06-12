@@ -4,7 +4,7 @@
 [![Docs](https://github.com/elkins/resonance-flow/actions/workflows/docs.yml/badge.svg)](https://github.com/elkins/resonance-flow/actions/workflows/docs.yml)
 [![codecov](https://codecov.io/gh/elkins/resonance-flow/branch/main/graph/badge.svg)](https://codecov.io/gh/elkins/resonance-flow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Documentation](https://img.shields.io/badge/docs-mkdocs--material-blue.svg)](https://elkins.github.io/resonance-flow/)
+[![Documentation](https://img.shields.io/badge/docs-mkdocs--material-blue.svg)](https://elkins-lab.github.io/resonance-flow/)
 [![PyPI version](https://img.shields.io/pypi/v/resonance-flow)](https://pypi.org/project/resonance-flow/)
 [![Python versions](https://img.shields.io/pypi/pyversions/resonance-flow)](https://pypi.org/project/resonance-flow/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -194,7 +194,7 @@ pytest --cov=resonance_flow tests
 
 ## 📚 Documentation
 
-Full theory, API reference, and examples at **[elkins.github.io/resonance-flow](https://elkins.github.io/resonance-flow/)**.
+Full theory, API reference, and examples at **[elkins-lab.github.io/resonance-flow](https://elkins-lab.github.io/resonance-flow/)**.
 
 ---
 

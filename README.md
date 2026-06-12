@@ -2,6 +2,7 @@
 
 [![Tests](https://github.com/elkins/resonance-flow/actions/workflows/test.yml/badge.svg)](https://github.com/elkins/resonance-flow/actions/workflows/test.yml)
 [![Docs](https://github.com/elkins/resonance-flow/actions/workflows/docs.yml/badge.svg)](https://github.com/elkins/resonance-flow/actions/workflows/docs.yml)
+[![codecov](https://codecov.io/gh/elkins/resonance-flow/branch/main/graph/badge.svg)](https://codecov.io/gh/elkins/resonance-flow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs--material-blue.svg)](https://elkins.github.io/resonance-flow/)
 [![PyPI version](https://img.shields.io/pypi/v/resonance-flow)](https://pypi.org/project/resonance-flow/)
